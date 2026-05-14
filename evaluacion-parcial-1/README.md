@@ -1,101 +1,59 @@
-# evaluacion-parcial-1
+# Evaluación Parcial 1 - Machine Learning
+**Alumno:** Vicente Alarcón
 
-[![Powered by Kedro](https://img.shields.io/badge/powered_by-kedro-ffc900?logo=kedro)](https://kedro.org)
+## Descripción del Proyecto
+Este proyecto es una evaluación práctica donde aplicamos conceptos de Machine Learning para analizar y predecir datos de una tienda. Utilizamos el framework **Kedro** para ordenar nuestro código en diferentes pasos (pipelines), desde la limpieza de los datos crudos hasta el entrenamiento de los modelos.
 
-## Overview
+### Objetivos de los Modelos
+Hemos entrenado tres modelos diferentes para resolver distintos problemas con nuestros datos:
+1. **Regresión:** Queremos predecir el `monto_total_venta` de una transacción. *(Nota: Tuvimos que sacar las variables `cantidad` y `precio_unitario` de este modelo porque estaban causando "fuga de datos" o Data Leakage, haciendo que el modelo simplemente multiplicara los valores y diera un resultado irrealmente perfecto).*
+2. **Clasificación:** Buscamos predecir a qué `segmento` pertenece un cliente (ej. Nuevo, Premium) basándonos en sus datos.
+3. **Clustering:** Usamos K-Means para agrupar a los clientes y encontrar patrones ocultos en las ventas.
 
-This is your new Kedro project, which was generated using `kedro 1.2.0`.
+---
 
-Take a look at the [Kedro documentation](https://docs.kedro.org) to get started.
+## Cómo ejecutar este proyecto
 
-## Rules and guidelines
+Este proyecto está configurado para Python 3.12.7. Para hacerlo funcionar en tu computadora, sigue estos pasos:
 
-In order to get the best out of the template:
-
-* Don't remove any lines from the `.gitignore` file we provide
-* Make sure your results can be reproduced by following a data engineering convention
-* Don't commit data to your repository
-* Don't commit any credentials or your local configuration to your repository. Keep all your credentials and local configuration in `conf/local/`
-
-## How to install dependencies
-
-Declare any dependencies in `requirements.txt` for `pip` installation.
-
-To install them, run:
-
+1. Crea un entorno virtual y actívalo:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
 ```
+
+2. Instala las librerías necesarias:
+```bash
 pip install -r requirements.txt
 ```
 
-## How to run your Kedro pipeline
-
-You can run your Kedro project with:
-
-```
+3. Ejecuta todo el flujo de datos (pipelines):
+```bash
 kedro run
 ```
 
-## How to test your Kedro project
+Al terminar, los modelos entrenados quedarán guardados en la carpeta `data/06_models/` y los reportes de rendimiento en `data/08_reporting/`.
 
-Have a look at the file `tests/test_run.py` for instructions on how to write your tests. You can run your tests as follows:
+---
 
-```
-pytest
-```
+## Estructura de nuestros Pipelines
 
-You can configure the coverage threshold in your project's `pyproject.toml` file under the `[tool.coverage.report]` section.
+El proyecto está dividido en los siguientes pasos lógicos:
 
+* **1. data_ingestion:** Solo carga los archivos `.csv` originales (ventas, productos, clientes, devoluciones) usando el Data Catalog de Kedro.
+* **2. data_cleaning:** Limpiamos los datos. Aquí rellenamos los valores nulos (n/a) y arreglamos los valores atípicos (outliers). Para los outliers decidimos usar "Winzorización" en lugar de borrarlos, así no perdemos datos valiosos de clientes reales que gastaron mucho.
+* **3. data_integration:** Juntamos todas las tablas en una sola. También borramos las columnas que no sirven para predecir (como los IDs o correos) y escalamos los números usando `StandardScaler` para que los modelos no se confundan con variables de distintos tamaños.
+* **4. ml_modeling:** Usamos la librería TPOT para que pruebe varios modelos automáticamente y elija el mejor para regresión y clasificación. Luego guardamos los resultados en formato `.pkl`.
 
-## Project dependencies
+---
 
-To see and update the dependency requirements for your project use `requirements.txt`. You can install the project requirements with `pip install -r requirements.txt`.
+## Justificación de Métricas obtenidas
 
-[Further information about project dependencies](https://docs.kedro.org/en/stable/kedro_project_setup/dependencies.html#project-specific-dependencies)
+**Modelo de Clasificación (Accuracy bajo):** 
+Si revisan los reportes generados, notarán que el modelo de clasificación obtuvo un Accuracy cercano al 42%. Aunque parece bajo, esto tiene una explicación técnica. Después de cruzar todas las tablas y limpiar los datos faltantes, solo nos quedaron cerca de 33 filas válidas con información en la columna `segmento`. Como tenemos 4 segmentos distintos, el algoritmo intenta aprender con casi 8 registros por clase, lo cual es muy poco para Machine Learning. Un resultado mayor en este escenario significaría que el modelo está sobreajustado (*Overfitting*).
 
-## How to work with Kedro and notebooks
+**Modelo de Regresión (Fuga de Datos corregida):**
+Al principio nuestro modelo de regresión tenía un $R^2$ de casi 1.0 (0.999). Nos dimos cuenta de que le estábamos pasando `cantidad` y `precio_unitario` como variables de entrada, y como el monto total es simplemente `cantidad * precio_unitario`, el modelo solo aprendió a hacer esa multiplicación matemática (Data Leakage). Para solucionarlo, excluimos esas variables en el archivo `conf/base/parameters.yml`, forzando al modelo a predecir usando otras variables reales como canales de venta y stock.
 
-> Note: Using `kedro jupyter` or `kedro ipython` to run your notebook provides these variables in scope: `context`, 'session', `catalog`, and `pipelines`.
->
-> Jupyter, JupyterLab, and IPython are already included in the project requirements by default, so once you have run `pip install -r requirements.txt` you will not need to take any extra steps before you use them.
-
-### Jupyter
-To use Jupyter notebooks in your Kedro project, you need to install Jupyter:
-
-```
-pip install jupyter
-```
-
-After installing Jupyter, you can start a local notebook server:
-
-```
-kedro jupyter notebook
-```
-
-### JupyterLab
-To use JupyterLab, you need to install it:
-
-```
-pip install jupyterlab
-```
-
-You can also start JupyterLab:
-
-```
-kedro jupyter lab
-```
-
-### IPython
-And if you want to run an IPython session:
-
-```
-kedro ipython
-```
-
-### How to ignore notebook output cells in `git`
-To automatically strip out all output cell contents before committing to `git`, you can use tools like [`nbstripout`](https://github.com/kynan/nbstripout). For example, you can add a hook in `.git/config` with `nbstripout --install`. This will run `nbstripout` before anything is committed to `git`.
-
-> *Note:* Your output cells will be retained locally.
-
-## Package your Kedro project
-
-[Further information about building project documentation and packaging your project](https://docs.kedro.org/en/stable/deploy/package_a_project/#package-an-entire-kedro-project)
+---
+En la carpeta `notebooks/01_EDA_Profesional.ipynb` incluí un cuaderno exploratorio donde analizo gráficamente algunos de estos puntos, como la diferencia al tratar los outliers.

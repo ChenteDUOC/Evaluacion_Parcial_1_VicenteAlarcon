@@ -1,0 +1,135 @@
+# ============================================================
+# PARÁMETROS GLOBALES DEL PROYECTO — evaluacion_parcial_1
+# ============================================================
+# Todos los hiperparámetros y configuraciones se centralizan
+# aquí para cumplir con la reproducibilidad (sin hardcoding).
+# Acceder desde nodes.py con: params["data_cleaning"]["winsorize_lower_quantile"]
+
+# -------------------------------------------------------------
+# FASE: Limpieza de Datos (data_cleaning)
+# -------------------------------------------------------------
+data_cleaning:
+  # Límites de Winzorización: valores fuera del P5–P95 se
+  # capan al percentil para mitigar outliers sin eliminar filas.
+  winsorize_lower_quantile: 0.05
+  winsorize_upper_quantile: 0.95
+
+# -------------------------------------------------------------
+# FASE: Ingeniería de Atributos (data_integration / feature)
+# -------------------------------------------------------------
+feature_engineering:
+  # Tipo de escalador aplicado sobre el dataset integrado.
+  # "standard" = StandardScaler (Z-Score, media 0 std 1)
+  # "minmax"   = MinMaxScaler (rango [0, 1])
+  scaler_type: "standard"
+
+  # Columnas a eliminar antes del modelado:
+  # IDs únicos no aportan información al modelo (alta cardinalidad sin señal).
+  cols_to_drop:
+    - "id_venta"
+    - "id_cliente"
+    - "id_producto"
+    - "id_devolucion"
+    - "nombre"      # nombre del cliente: PII y cardinalidad máxima
+    - "email"       # ídem
+    - "nombre_x"    # artefacto de merge (nombre del cliente)
+    - "nombre_y"    # artefacto de merge (nombre del producto)
+
+  # Columnas numéricas a escalar
+  cols_to_scale:
+    - "precio_unitario"
+    - "cantidad"
+    - "monto_total_venta"
+    - "gasto_historico_cliente"
+    - "precio_unitario_zscore"
+    - "monto_total_venta_zscore"
+
+# -------------------------------------------------------------
+# FASE: ML — Regresión con TPOT
+# -------------------------------------------------------------
+ml_regression:
+  target: "monto_total_venta"
+  test_size: 0.2
+  random_state: 42
+  # Columnas a excluir del feature set:
+  # - monto_total_venta_zscore: derivada directa del target (data leakage)
+  # - precio_unitario_zscore: redundante con precio_unitario ya escalado
+  # - gasto_historico_cliente: contiene info del target (leakage parcial)
+  # FIX: Se excluyen cantidad y precio_unitario para evitar data leakage
+  cols_excluir:
+    - "monto_total_venta_zscore"
+    - "precio_unitario_zscore"
+    - "gasto_historico_cliente"
+    - "cantidad"
+    - "precio_unitario"
+  tpot:
+    cv: 5
+    scoring: "neg_mean_squared_error"
+    max_time_mins: 5             # Presupuesto temporal total (minutos)
+    max_eval_time_mins: 1        # Máximo por pipeline individual
+    search_space: "linear-light" # Búsqueda rápida con modelos eficientes
+    random_state: 42
+    verbosity: 2
+    n_jobs: 1                    # Secuencial (evita problemas con Dask en Windows)
+
+# -------------------------------------------------------------
+# FASE: ML — Clasificación con TPOT
+# -------------------------------------------------------------
+ml_classification:
+  target: "segmento"
+  test_size: 0.2
+  random_state: 42
+  # Excluir columnas no numéricas ya manejadas y z-scores redundantes
+  cols_excluir:
+    - "monto_total_venta_zscore"
+    - "precio_unitario_zscore"
+  tpot:
+    cv: 3                        # Reducido por tamaño de muestra (~33 filas)
+    scoring: "f1_macro"
+    max_time_mins: 5
+    max_eval_time_mins: 1
+    search_space: "linear-light"
+    random_state: 42
+    verbosity: 2
+    n_jobs: 1
+
+# -------------------------------------------------------------
+# FASE: ML — Clustering (K-Means + PCA)
+# -------------------------------------------------------------
+ml_clustering:
+  # Rango de k a evaluar con Elbow Method + Silhouette
+  k_range: [2, 3, 4, 5, 6, 7, 8]
+  pca_components: 3
+  random_state: 42
+  max_iter: 300
+  # Excluir z-scores (redundantes con las variables originales escaladas)
+  cols_excluir:
+    - "monto_total_venta_zscore"
+    - "precio_unitario_zscore"
+
+# -------------------------------------------------------------
+# FASE: AutoML y Modelado (notebooks 03_AutoML_TPOT) — Legacy
+# -------------------------------------------------------------
+automl:
+  # Variable objetivo para regresión
+  target_regresion: "monto_total_venta"
+
+  # Variable objetivo para clasificación
+  target_clasificacion: "segmento"
+
+  # TPOT — configuración conservadora para entornos académicos
+  tpot_generations: 5
+  tpot_population_size: 20
+  tpot_cv: 5
+  tpot_random_state: 42
+  tpot_verbosity: 2         # 0=silencioso, 2=barra de progreso, 3=detallado
+  tpot_n_jobs: -1           # Usar todos los núcleos disponibles
+
+  # K-Means — segmentación no supervisada
+  kmeans_n_clusters: 4      # Basado en regla heurística del Elbow Method
+  kmeans_random_state: 42
+  kmeans_max_iter: 300
+
+  # Split train/test
+  test_size: 0.2
+  random_state: 42

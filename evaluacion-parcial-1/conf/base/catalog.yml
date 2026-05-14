@@ -87,3 +87,29 @@ reporte_diagnostico:
 reporte_validacion:
   type: json.JSONDataset
   filepath: data/08_reporting/reporte_validacion.json
+
+# ===== CAPA 06: MODELS (Modelos entrenados) =====
+modelo_clasificacion:
+  type: pickle.PickleDataset
+  filepath: data/06_models/mejor_modelo_clasificacion.pkl
+
+modelo_regresion:
+  type: pickle.PickleDataset
+  filepath: data/06_models/mejor_modelo_regresion.pkl
+
+modelo_clustering:
+  type: pickle.PickleDataset
+  filepath: data/06_models/modelo_clustering.pkl
+
+# ===== REPORTES DE MODELADO =====
+reporte_clasificacion:
+  type: json.JSONDataset
+  filepath: data/08_reporting/informe_clasificacion.json
+
+reporte_regresion:
+  type: json.JSONDataset
+  filepath: data/08_reporting/informe_regresion.json
+
+reporte_clustering:
+  type: json.JSONDataset
+  filepath: data/08_reporting/informe_clustering.json
